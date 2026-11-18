@@ -54,6 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--recheck", action="store_true")
 
     sub.add_parser("demo", help="load synthetic lesson-builder runs and print the report")
+    rp = sub.add_parser("replay", help="back-test past runs from a case file against real evidence")
+    rp.add_argument("cases")
     r = sub.add_parser("report", help="print the four checks")
     r.add_argument("--json", action="store_true")
 
@@ -64,6 +66,12 @@ def main(argv: list[str] | None = None) -> int:
         from .demo import run_demo
         _print_report(run_demo(a.db))
         print(f"\nwrote {a.db}; now run: runactuals --db {a.db} serve  and open http://127.0.0.1:4318/")
+        return 0
+
+    if a.cmd == "replay":
+        from .replay import print_rows, replay
+        print_rows(replay(a.cases, a.db))
+        print(f"\nwrote {a.db}; view with: runactuals --db {a.db} serve")
         return 0
 
     if a.cmd == "serve" and a.demo:

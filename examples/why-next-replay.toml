@@ -1,0 +1,154 @@
+# Back-test RunActuals on the real Why Next? lesson builder history (read-only).
+#
+#   runactuals --db replay.db replay examples/why-next-replay.toml
+#
+# Each case is one scheduled run of the lesson builder (it runs every two hours,
+# usually starting around :50 past an odd hour PT). "claimed" is what the
+# scheduler's automation status said. It is not what happened. "expect_head" is
+# the pushed head the builder's own end-of-run report later named as the green
+# tip. That's independent ground truth for the evidence adapter.
+#
+# Sources: "journal" is the bot's run journal (memory) for the next run, which
+# re-checked the previous one. "brief" is the Nov 17 replay request. Start times
+# marked "inferred" come from the :50 cadence and the run's first commit; the
+# others are the times the reports named.
+
+agent = "lesson-builder"
+# Assumed time from start until the scheduler reported a status. Plus grace, the
+# evidence window is start + 115 min, just before the next run starts.
+run_minutes = 25
+
+[evidence]
+adapter = "github_commit_ci"
+repo = "pandeyaby/why-next"
+branch = "visual-draft"
+message_regex = "^Pipeline: flagship lesson "
+workflows = ["validate"]
+grace_minutes = 90
+auth = "gh"              # use the GitHub CLI's login; no token in env or config
+
+# ---- runs the scheduler marked failed or interrupted
+
+[[runs]]
+label = "Nov 6 ~5:50 AM PT"
+start = 2026-11-06T05:50:00-08:00
+claimed = "failed"
+expect_head = "12d4eb28"
+source = "journal Nov 6 6 AM: marked failed in automation_status but shipped; start inferred"
+
+[[runs]]
+label = "Nov 7 ~11:59 AM PT"
+start = 2026-11-07T11:59:00-08:00
+claimed = "failed"
+expect_head = "66bd86a4"
+source = "journal Nov 7 2:48 PM: 11:59 AM run marked failed, CI run 42411883788 green"
+
+[[runs]]
+label = "Nov 7 ~7:54 PM PT"
+start = 2026-11-07T19:54:00-08:00
+claimed = "failed"
+expect_head = "c9d945d8"
+source = "journal Nov 7 7:54-8:45 PM: marked failed but shipped, tip c9d945d"
+
+[[runs]]
+label = "Nov 8 ~3:58 PM PT"
+start = 2026-11-08T15:58:00-08:00
+claimed = "failed"
+source = "journal Nov 8 6:48 PM: the 3:58 PM run marked failed had actually shipped"
+
+[[runs]]
+label = "Nov 9 ~3:50 AM PT"
+start = 2026-11-09T03:50:00-08:00
+claimed = "failed"
+expect_head = "6ff94a55"
+source = "journal Nov 9 6:50 AM: 4 AM run marked failed shipped 3 lessons, tip 6ff94a55; start inferred"
+
+[[runs]]
+label = "Nov 9 ~7:58 PM PT"
+start = 2026-11-09T19:58:00-08:00
+claimed = "failed"
+source = "journal Nov 9 10:45 PM: the 7:58 PM run marked failed"
+
+[[runs]]
+label = "Nov 9 ~11:50 PM PT"
+start = 2026-11-09T23:50:00-08:00
+claimed = "failed"
+source = "journal Nov 10 2:50 AM: the 12 AM run marked failed; start inferred"
+
+[[runs]]
+label = "Nov 10 ~3:50 AM PT"
+start = 2026-11-10T03:50:00-08:00
+claimed = "failed"
+source = "journal Nov 10 6:44 AM: the 4 AM run marked failed shipped 3 lessons; start inferred"
+
+[[runs]]
+label = "Nov 15 ~3:47 PM PT"
+start = 2026-11-15T15:47:00-08:00
+claimed = "failed"
+expect_head = "13c191cb"
+source = "journal Nov 15 5:50 PM: the 3:47 PM run marked failed had shipped, tip 13c191cb"
+
+[[runs]]
+label = "Nov 17 ~11:45 AM PT"
+start = 2026-11-17T11:45:00-08:00
+claimed = "failed"
+expect_head = "66d331fa"
+source = "brief: K-Pg 090f5fcc run; tip 66d331fa CI 44166327238"
+
+[[runs]]
+label = "Nov 17 ~3:53 PM PT"
+start = 2026-11-17T15:53:00-08:00
+claimed = "interrupted"
+expect_head = "14cd7655"
+source = "brief: commits 1160438f, 6962f71e, b5ed1513, vectors 2ac9ea4f, tip 14cd7655, CI 44208356938"
+
+# ---- runs the scheduler marked succeeded (controls: should stay consistent)
+
+[[runs]]
+label = "Nov 7 ~1:50 PM PT"
+start = 2026-11-07T13:50:00-08:00
+claimed = "succeeded"
+expect_head = "e9a81c3c"
+source = "journal Nov 7 2:48 PM: succeeded, tip e9a81c3c, CI 42421038459; start inferred"
+
+[[runs]]
+label = "Nov 8 ~5:50 PM PT"
+start = 2026-11-08T17:50:00-08:00
+claimed = "succeeded"
+expect_head = "0e33e349"
+source = "journal Nov 8 6:48 PM: succeeded, tip 0e33e349, CI 42551374038; start inferred"
+
+[[runs]]
+label = "Nov 9 ~5:50 AM PT"
+start = 2026-11-09T05:50:00-08:00
+claimed = "succeeded"
+expect_head = "6b8d556b"
+source = "journal Nov 9 6:50 AM: succeeded, tip 6b8d556b, CI 42636027900; start inferred"
+
+[[runs]]
+label = "Nov 9 ~9:50 PM PT"
+start = 2026-11-09T21:50:00-08:00
+claimed = "succeeded"
+expect_head = "c5c5927d"
+source = "journal Nov 9 10:45 PM: succeeded, tip c5c5927d, CI 42768668692; start inferred"
+
+[[runs]]
+label = "Nov 10 ~1:50 AM PT"
+start = 2026-11-10T01:50:00-08:00
+claimed = "succeeded"
+expect_head = "b09a49cc"
+source = "journal Nov 10 2:50 AM: succeeded, tip b09a49cc, CI 42799898018; start inferred"
+
+[[runs]]
+label = "Nov 10 ~5:50 AM PT"
+start = 2026-11-10T05:50:00-08:00
+claimed = "succeeded"
+expect_head = "893e20ba"
+source = "journal Nov 10 6:44 AM: succeeded, tip 893e20ba, CI 42834174556; start inferred"
+
+[[runs]]
+label = "Nov 15 ~5:50 PM PT"
+start = 2026-11-15T17:50:00-08:00
+claimed = "succeeded"
+expect_head = "e44ac000"
+source = "journal Nov 15 5:50 PM: shipped, tip e44ac000; learn-e2e still in_progress when the run ended"

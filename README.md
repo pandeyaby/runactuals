@@ -132,10 +132,35 @@ reads `GITHUB_TOKEN` from the environment for private repos. Results:
 - `pending`: CI is still running, or the window is still open.
 - `unknown`: the API call failed.
 
+GitHub Actions runs only on the pushed head, not on every commit in a push. So the
+CI verdict comes from the newest commit in the run's window, at or after the matched
+commit, that has a workflow run. That's the run's final state. Set `auth = "gh"` to
+use the GitHub CLI's login instead of a `GITHUB_TOKEN`.
+
 ```bash
 runactuals --db runactuals.db verify --config examples/lesson-builder.toml
 runactuals --db runactuals.db serve --config examples/lesson-builder.toml   # re-checks every 5 minutes
 ```
+
+## Back-test on real history: `runactuals replay`
+
+Before you instrument an agent, replay its past runs from a case file. Each case
+gives a start time and the status the scheduler reported. The evidence adapter then
+checks the real repository, read-only. See
+[`examples/why-next-replay.toml`](examples/why-next-replay.toml): it covers 18 real
+Why Next? lesson-builder runs from Nov 6–17, 2026. Eleven were marked failed or
+interrupted, and seven were marked succeeded as controls.
+
+```bash
+runactuals --db replay.db replay examples/why-next-replay.toml
+```
+
+Result ([`examples/why-next-replay.out.txt`](examples/why-next-replay.out.txt)):
+- All 11 runs marked failed were flagged as false failures, each with its lesson
+  commits and the green `validate` run.
+- All 7 runs marked succeeded stayed consistent.
+- For all 14 cases with ground truth, the pushed head matched the green tip that the
+  builder's own later report named.
 
 ## Fan-out to DataCat / Grafana
 

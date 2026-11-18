@@ -94,6 +94,38 @@ class GitHubCommitCITest(unittest.TestCase):
             raise urllib.error.URLError("offline")
         self.assertEqual(adapter(boom).check(run()).status, "unknown")
 
+    def test_ci_found_on_the_pushed_head_when_lesson_commits_have_none(self):
+        # Real why-next shape: three lessons + vectors + queue note pushed together;
+        # Actions only ran on the pushed head (the queue note).
+        window = [commit("tip", "Queue: age-mix note"), commit("vec", "Guide: embed vectors"),
+                  commit("l3", "lesson: c"), commit("l2", "lesson: b"), commit("l1", "lesson: a")]
+        fake = FakeGitHub(window, {"tip": [ci(id=44208356938)]})
+        e = adapter(fake).check(run())
+        self.assertEqual(e.status, "verified")
+        self.assertEqual((e.details["sha"], e.details["ci_sha"]), ("l3", "tip"))
+        self.assertEqual(len(e.details["matched"]), 3)
+        self.assertIn("via pushed head tip", e.summary)
+
+    def test_later_push_failing_ci_refutes(self):
+        window = [commit("tip", "Queue: note"), commit("l1", "lesson: a")]
+        fake = FakeGitHub(window, {"tip": [ci("failure")]})
+        self.assertEqual(adapter(fake).check(run()).status, "refuted")
+
+    def test_newest_green_push_in_the_window_is_the_final_state(self):
+        # The lesson commit had its own green push; a later vectors push is the final state.
+        window = [commit("vec", "Guide: vectors"), commit("l1", "lesson: a")]
+        fake = FakeGitHub(window, {"l1": [ci(id=1)], "vec": [ci(id=2)]})
+        e = adapter(fake).check(run())
+        self.assertEqual((e.status, e.details["ci_sha"]), ("verified", "vec"))
+        fake = FakeGitHub(window, {"l1": [ci(id=1)], "vec": [ci("failure", id=2)]})
+        self.assertEqual(adapter(fake).check(run()).status, "refuted")
+
+    def test_latest_attempt_of_a_workflow_wins(self):
+        rerun = dict(ci("success", id=2), workflow_id=7)
+        first = dict(ci("failure", id=1), workflow_id=7)
+        fake = FakeGitHub([commit("a")], {"a": [first, rerun]})
+        self.assertEqual(adapter(fake).check(run()).status, "verified")
+
     def test_unknown_adapter_name(self):
         with self.assertRaises(ValueError):
             build_adapter({"adapter": "nope"})

@@ -1,0 +1,21 @@
+# runactuals replay examples/why-next-replay.toml, run Nov 17, 2026 ~11:45 PM PT against live GitHub (read-only)
+run                    claimed     verified  verdict        lessons head     expected  CI run
+Nov 6 ~5:50 AM PT      failed      succeeded false_failure        3 12d4eb28 12d4eb28 ok 42236682575
+Nov 7 ~11:59 AM PT     failed      succeeded false_failure        3 66bd86a4 66bd86a4 ok 42411883788
+Nov 7 ~1:50 PM PT      succeeded   succeeded consistent           3 e9a81c3c e9a81c3c ok 42421038459
+Nov 7 ~7:54 PM PT      failed      succeeded false_failure        3 c9d945d8 c9d945d8 ok 42447066850
+Nov 8 ~3:58 PM PT      failed      succeeded false_failure        3 97cc8050           42540669984
+Nov 8 ~5:50 PM PT      succeeded   succeeded consistent           3 0e33e349 0e33e349 ok 42551374038
+Nov 9 ~3:50 AM PT      failed      succeeded false_failure        3 6ff94a55 6ff94a55 ok 42618283245
+Nov 9 ~5:50 AM PT      succeeded   succeeded consistent           2 6b8d556b 6b8d556b ok 42636027900
+Nov 9 ~7:58 PM PT      failed      succeeded false_failure        3 114eeb65           42756139202
+Nov 9 ~9:50 PM PT      succeeded   succeeded consistent           3 c5c5927d c5c5927d ok 42768668692
+Nov 9 ~11:50 PM PT     failed      succeeded false_failure        3 6414f681           42782759315
+Nov 10 ~1:50 AM PT     succeeded   succeeded consistent           3 b09a49cc b09a49cc ok 42799898018
+Nov 10 ~3:50 AM PT     failed      succeeded false_failure        3 89ae6cb6           42816700356
+Nov 10 ~5:50 AM PT     succeeded   succeeded consistent           3 893e20ba 893e20ba ok 42834174556
+Nov 15 ~3:47 PM PT     failed      succeeded false_failure        3 13c191cb 13c191cb ok 43779673898
+Nov 15 ~5:50 PM PT     succeeded   succeeded consistent           3 e44ac000 e44ac000 ok 43792177473
+Nov 17 ~11:45 AM PT    failed      succeeded false_failure        2 66d331fa 66d331fa ok 44166327238
+Nov 17 ~3:53 PM PT     interrupted succeeded false_failure        2 14cd7655 14cd7655 ok 44208356938
+runs=18 false_failures=11 false_successes=0 unverified_or_pending=0 head_matches_ground_truth=14/14
