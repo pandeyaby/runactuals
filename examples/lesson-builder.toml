@@ -1,0 +1,23 @@
+# RunActuals config modelled on the Why Next? lesson builder.
+#
+# The builder runs every two hours. It writes a lesson, pushes a commit to
+# visual-draft, then waits for CI. The wait for the learn-e2e job can take 18-21
+# minutes, and the scheduler often marks the run "failed" or "interrupted" even
+# though the commit already landed and CI went green. RunActuals ignores the run
+# status and checks the evidence instead.
+
+[[agents]]
+name = "lesson-builder"
+
+[agents.evidence]
+adapter = "github_commit_ci"
+repo = "pandeyaby/why-next"
+branch = "visual-draft"
+# Only lesson commits count as this run's outcome.
+message_regex = "^lesson: "
+# Leave empty to require every workflow run on the commit to be green.
+workflows = ["CI"]
+# How long after the run ends a commit or CI result may still appear.
+grace_minutes = 45
+# Reads GITHUB_TOKEN from the environment if set (needed for private repos).
+token_env = "GITHUB_TOKEN"

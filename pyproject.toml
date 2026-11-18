@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "runactuals"
+version = "0.1.0.dev0"
+description = "Claims versus actuals, for every agent run. A self-hosted, OpenTelemetry-native flight recorder for AI agents."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = []
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Monitoring",
+]
+
+[project.scripts]
+runactuals = "runactuals.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,20 @@
+# docker compose up  ->  dashboard and OTLP/HTTP receiver on http://localhost:4318
+services:
+  runactuals:
+    build: .
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - runactuals-data:/data
+    environment:
+      # Seed synthetic lesson-builder runs into an empty database. Set to 0 for real use.
+      RUNACTUALS_DEMO: "1"
+      # Evidence adapters to run every 5 minutes (see examples/).
+      # RUNACTUALS_CONFIG: /app/examples/lesson-builder.toml
+      # GITHUB_TOKEN: ${GITHUB_TOKEN}            # needed for private repos
+      # RUNACTUALS_INGEST_TOKEN: ${RUNACTUALS_INGEST_TOKEN}  # require a bearer token on /v1/traces
+    # Fan the same OTLP stream out to DataCat, Grafana Alloy, or any OTLP/HTTP backend:
+    # command: ["serve", "--forward", "http://datacat:4318/v1/traces"]
+    restart: unless-stopped
+volumes:
+  runactuals-data:

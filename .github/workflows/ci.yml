@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install (no runtime dependencies) + interop test dependency
+        run: pip install . opentelemetry-proto
+      - name: Unit and end-to-end tests
+        working-directory: tests
+        run: python -m unittest -v
+      - name: Demo smoke test
+        run: |
+          runactuals --db /tmp/demo.db demo | tee demo.txt
+          grep -q "false_failures=2" demo.txt
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t runactuals:ci .
+      - name: Boot with demo data and check the dashboard
+        run: |
+          docker run -d --name ra -p 4318:4318 -e RUNACTUALS_DEMO=1 runactuals:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:4318/healthz && break; sleep 1; done
+          curl -fs http://127.0.0.1:4318/ | grep -q "FALSE FAILURE"
+          curl -fs http://127.0.0.1:4318/api/report | python3 -c "import json,sys; s=json.load(sys.stdin)['summary']; assert s['false_failures']==2, s; print(s)"
+      - if: always()
+        run: docker logs ra || true
