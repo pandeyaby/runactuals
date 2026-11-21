@@ -1,4 +1,4 @@
-"""runactuals serve | verify | demo | report"""
+"""runactuals serve | verify | demo | report | proxy | wrap"""
 
 from __future__ import annotations
 
@@ -33,6 +33,33 @@ def _print_report(rep) -> None:
     print(f"audit_events={len(rep.audit)} flagged={len(flagged)}"
           + "".join(f"\n  ! {e['action']} {e['target']}: {e['flag']}" for e in flagged))
 
+def _explicit_db(argv: list[str] | None) -> bool:
+    args = argv if argv is not None else sys.argv[1:]
+    return "--db" in args or bool(os.environ.get("RUNACTUALS_DB"))
+
+
+def _writer(a, argv: list[str] | None, service: str):
+    from .record import SpanWriter
+    db = a.db if _explicit_db(argv) else None
+    endpoint = getattr(a, "endpoint", None)
+    if db is None and not endpoint:
+        endpoint = "http://127.0.0.1:4318"
+    store = Store(db) if db else None
+    return SpanWriter(store=store, endpoint=endpoint, service_name=service), store
+
+
+def _upstreams(a) -> dict[str, str]:
+    out = {}
+    if getattr(a, "openai_upstream", None):
+        out["openai"] = a.openai_upstream
+    if getattr(a, "anthropic_upstream", None):
+        out["anthropic"] = a.anthropic_upstream
+    if getattr(a, "gemini_upstream", None):
+        out["gemini"] = a.gemini_upstream
+    if getattr(a, "mcp_upstream", None):
+        out["mcp"] = a.mcp_upstream
+    return out
+
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="runactuals", description="Claims versus actuals, for every agent run.")
@@ -48,6 +75,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--verify-every", type=float, default=300, help="seconds between evidence checks")
     s.add_argument("--demo", action="store_true", default=os.environ.get("RUNACTUALS_DEMO") == "1",
                    help="seed synthetic demo data into an empty database first")
+    s.add_argument("--proxy-port", type=int,
+                   default=int(os.environ.get("RUNACTUALS_PROXY_PORT") or "0"),
+                   help="also start the LLM/MCP recording proxy on this port (0 = off)")
+    s.add_argument("--openai-upstream", default=os.environ.get("RUNACTUALS_OPENAI_UPSTREAM"))
+    s.add_argument("--anthropic-upstream", default=os.environ.get("RUNACTUALS_ANTHROPIC_UPSTREAM"))
+    s.add_argument("--gemini-upstream", default=os.environ.get("RUNACTUALS_GEMINI_UPSTREAM"))
+    s.add_argument("--mcp-upstream", default=os.environ.get("RUNACTUALS_MCP_UPSTREAM"))
+    s.add_argument("--proxy-agent", default=os.environ.get("RUNACTUALS_AGENT", "proxy"))
 
     v = sub.add_parser("verify", help="run evidence adapters once")
     v.add_argument("--config", required=True)
@@ -58,6 +93,24 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("cases")
     r = sub.add_parser("report", help="print the four checks")
     r.add_argument("--json", action="store_true")
+
+    px = sub.add_parser("proxy", help="HTTP proxy that records LLM and MCP calls")
+    px.add_argument("--host", default=os.environ.get("RUNACTUALS_PROXY_HOST", "127.0.0.1"))
+    px.add_argument("--port", type=int, default=int(os.environ.get("RUNACTUALS_PROXY_PORT") or "8787"))
+    px.add_argument("--endpoint", default=os.environ.get("RUNACTUALS_ENDPOINT"),
+                    help="OTLP collector, default http://127.0.0.1:4318 when --db is omitted")
+    px.add_argument("--openai-upstream", default=os.environ.get("RUNACTUALS_OPENAI_UPSTREAM"))
+    px.add_argument("--anthropic-upstream", default=os.environ.get("RUNACTUALS_ANTHROPIC_UPSTREAM"))
+    px.add_argument("--gemini-upstream", default=os.environ.get("RUNACTUALS_GEMINI_UPSTREAM"))
+    px.add_argument("--mcp-upstream", default=os.environ.get("RUNACTUALS_MCP_UPSTREAM"))
+    px.add_argument("--agent", default=os.environ.get("RUNACTUALS_AGENT", "proxy"))
+    px.add_argument("--timeout", type=float, default=float(os.environ.get("RUNACTUALS_PROXY_TIMEOUT") or "300"))
+
+    w = sub.add_parser("wrap", help="stdio wrapper that records MCP JSON-RPC")
+    w.add_argument("--endpoint", default=os.environ.get("RUNACTUALS_ENDPOINT"),
+                   help="OTLP collector, default http://127.0.0.1:4318 when --db is omitted")
+    w.add_argument("--agent", default=os.environ.get("RUNACTUALS_AGENT", "mcp"))
+    w.add_argument("command", nargs=argparse.REMAINDER, help="command to wrap, after --")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -83,6 +136,29 @@ def main(argv: list[str] | None = None) -> int:
             run_demo(a.db)
             logging.info("seeded synthetic demo data")
 
+    if a.cmd == "proxy":
+        from .proxy import serve_proxy
+        writer, _owned = _writer(a, argv, "runactuals-proxy")
+        srv = serve_proxy(writer, a.host, a.port, upstreams=_upstreams(a),
+                          agent=a.agent, timeout=a.timeout)
+        logging.info("RunActuals proxy listening on http://%s:%d", a.host, a.port)
+        try:
+            srv.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        return 0
+
+    if a.cmd == "wrap":
+        from .mcp import wrap_stdio
+        command = list(a.command)
+        if command and command[0] == "--":
+            command = command[1:]
+        if not command:
+            logging.error("wrap needs a command, e.g. runactuals wrap -- my-mcp-server")
+            return 2
+        writer, _owned = _writer(a, argv, "runactuals-wrap")
+        return wrap_stdio(command, writer, agent=a.agent)
+
     store = Store(a.db)
     if a.cmd == "verify":
         for row in verify_runs(store, load_config(a.config), recheck=a.recheck):
@@ -97,6 +173,14 @@ def main(argv: list[str] | None = None) -> int:
 
     srv = serve(store, a.host, a.port, forward=a.forward,
                 ingest_token=os.environ.get("RUNACTUALS_INGEST_TOKEN") or None)
+    if getattr(a, "proxy_port", 0):
+        from .proxy import serve_proxy
+        from .record import SpanWriter
+        proxy = serve_proxy(SpanWriter(store=store, service_name="runactuals-proxy"),
+                            a.host, a.proxy_port, upstreams=_upstreams(a),
+                            agent=getattr(a, "proxy_agent", "proxy"))
+        threading.Thread(target=proxy.serve_forever, daemon=True).start()
+        logging.info("LLM/MCP proxy listening on http://%s:%d", a.host, a.proxy_port)
     if a.config:
         cfg = load_config(a.config)
 

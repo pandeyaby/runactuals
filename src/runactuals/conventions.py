@@ -15,6 +15,8 @@ GEN_AI_TOOL_CALL_ARGS = "gen_ai.tool.call.arguments"
 GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
 GEN_AI_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 GEN_AI_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+GEN_AI_PROVIDER = "gen_ai.provider.name"
+GEN_AI_FINISH_REASONS = "gen_ai.response.finish_reasons"
 
 OP_INVOKE_AGENT = "invoke_agent"
 OP_EXECUTE_TOOL = "execute_tool"

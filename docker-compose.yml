@@ -4,6 +4,8 @@ services:
     build: .
     ports:
       - "127.0.0.1:4318:4318"
+      # LLM/MCP recording proxy (uncomment and set RUNACTUALS_PROXY_PORT=8787):
+      # - "127.0.0.1:8787:8787"
     volumes:
       - runactuals-data:/data
     environment:
@@ -13,6 +15,7 @@ services:
       # RUNACTUALS_CONFIG: /app/examples/lesson-builder.toml
       # GITHUB_TOKEN: ${GITHUB_TOKEN}            # needed for private repos
       # RUNACTUALS_INGEST_TOKEN: ${RUNACTUALS_INGEST_TOKEN}  # require a bearer token on /v1/traces
+      # RUNACTUALS_PROXY_PORT: "8787"   # record LLM/MCP calls on :8787
     # Fan the same OTLP stream out to DataCat, Grafana Alloy, or any OTLP/HTTP backend:
     # command: ["serve", "--forward", "http://datacat:4318/v1/traces"]
     restart: unless-stopped

@@ -170,11 +170,102 @@ runactuals serve --forward http://datacat:4318/v1/traces --forward http://alloy:
 
 Each request body is forwarded as-is, with the same content type and encoding.
 
+
+## Record every LLM and MCP call, without per-bot hooks
+
+Point your SDKs at a recording proxy instead of instrumenting each bot. The
+proxy forwards the request to the real provider, then writes a span to the
+same store the dashboard already uses: model (or MCP tool), latency, token
+counts, and cost from a price table. API keys are forwarded upstream and
+stripped from everything that is stored.
+
+```bash
+# terminal 1: dashboard + OTLP collector
+runactuals --db runactuals.db serve --proxy-port 8787
+
+# or run the proxy as its own process (ships spans to the collector by default)
+runactuals proxy --port 8787
+```
+
+Then aim the client at the proxy, not the provider:
+
+```bash
+export OPENAI_BASE_URL=http://127.0.0.1:8787/openai/v1
+export ANTHROPIC_BASE_URL=http://127.0.0.1:8787/anthropic
+# Google GenAI (Gemini API):
+#   client = genai.Client(http_options={"base_url": "http://127.0.0.1:8787/gemini"})
+```
+
+Paths the proxy accepts:
+
+| Prefix | Default upstream | Typical client base URL |
+|---|---|---|
+| `/openai/...` | `https://api.openai.com` | `http://127.0.0.1:8787/openai/v1` |
+| `/anthropic/...` | `https://api.anthropic.com` | `http://127.0.0.1:8787/anthropic` |
+| `/gemini/...` | `https://generativelanguage.googleapis.com` | `http://127.0.0.1:8787/gemini` |
+| `/mcp/...` | none (set `--mcp-upstream`) | your MCP streamable-HTTP client |
+| `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses` | OpenAI upstream | `http://127.0.0.1:8787/v1` |
+| `/v1/messages` | Anthropic upstream | |
+
+Override an upstream with `--openai-upstream`, `--anthropic-upstream`,
+`--gemini-upstream`, or `--mcp-upstream` (OpenAI-compatible hosts such as a
+local vLLM work the same way). The proxy only talks to those configured
+origins; it is not an open proxy.
+
+Each call becomes a `chat` or `embeddings` span (`execute_tool` for MCP
+`tools/call`) with:
+
+- `gen_ai.request.model` / `gen_ai.tool.name`
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` when the provider reports them
+- `runactuals.cost.usd` from the [price table](src/runactuals/prices.py) (USD per 1M tokens; unknown models leave cost unset)
+- latency, HTTP status, and redacted request/response previews
+
+If the request carries a W3C `traceparent` (or `x-runactuals-trace-id`), the
+span joins that run. Otherwise the proxy opens a new run. Set
+`x-runactuals-agent` to name the bot (default `proxy`). Streaming responses
+are fully buffered so usage on the final chunk can be recorded; the client
+still receives the complete stream.
+
+Cost rates go stale. Override them with a JSON file:
+
+```bash
+export RUNACTUALS_PRICES=./my-prices.json   # {"gemini-2.5-flash": {"input": 0.30, "output": 2.50}}
+```
+
+### MCP stdio wrapper
+
+For servers that speak MCP over stdio (Content-Length framing or NDJSON):
+
+```bash
+runactuals wrap --agent lesson-builder -- my-mcp-server --flag
+```
+
+The wrapper sits between the client and the child, records `tools/call` (and
+other JSON-RPC methods), and exits with the child's status.
+
+### Routing Why Next? lesson-builder Gemini calls
+
+The lesson builder can keep its existing Gemini client and only change the
+base URL (the API key stays in the environment and is never written to the
+store):
+
+```python
+from google import genai
+client = genai.Client(http_options={"base_url": "http://127.0.0.1:8787/gemini"})
+```
+
+Each `generateContent` / `embedContent` call then shows up on the RunActuals
+dashboard with token counts and price-table cost, so reports no longer need a
+per-run Gemini estimate. To attach those calls to the builder's own run,
+propagate a `traceparent` header from the SDK span, or set
+`x-runactuals-trace-id` and `x-runactuals-agent: lesson-builder`.
+
 ## API
 
 - `POST /v1/traces`: OTLP/HTTP. Set `RUNACTUALS_INGEST_TOKEN` to require `Authorization: Bearer …`.
 - `GET /`: dashboard. `GET /runs/<trace_id>`: one run.
 - `GET /api/report`: the four checks as JSON. `GET /healthz`.
+- Proxy (default `http://127.0.0.1:8787`, or `serve --proxy-port`): `GET /healthz`, plus the path prefixes in the proxy section above.
 
 ## Development
 
@@ -190,6 +281,7 @@ The TypeScript SDK in `sdk-ts/` is a stub for now.
 - Drift and false-failure alerts, sent out as OTLP metrics or webhooks.
 - TypeScript SDK, plus auto-instrumentation for common agent frameworks.
 - Optional Postgres storage.
+- True streamed (not buffered) proxy responses; Azure OpenAI path mapping; live price feeds.
 
 ## License
 
